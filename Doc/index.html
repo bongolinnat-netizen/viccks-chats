@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdumDate - Find Love in Kumasi</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+  body{background:#fff0f3; display:flex; justify-content:center; min-height:100vh}
+ .app{width:100%; max-width:400px; background:white; min-height:100vh; box-shadow:0 0 20px rgba(0,0,0,0.1)}
+ .header{background:linear-gradient(90deg,#b91c1c,#ec4899); color:white; padding:15px; text-align:center; font-weight:bold; font-size:20px}
+ .header small{display:block; font-weight:normal; font-size:11px; letter-spacing:3px; margin-top:2px}
+ .screen{display:none; padding:20px}.screen.active{display:block}
+  input,textarea,select{width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:10px}
+  button{width:100%; padding:12px; border:none; border-radius:10px; font-weight:bold; cursor:pointer; margin-top:10px}
+ .btn-main{background:#b91c1c; color:white}
+ .btn-like{background:#22c55e; color:white; width:48%}
+ .btn-pass{background:#e5e7eb; color:#333; width:48%}
+ .card{border-radius:20px; overflow:hidden; box-shadow:0 5px 20px rgba(0,0,0,0.15); text-align:center}
+ .card img{width:100%; height:350px; object-fit:cover}
+ .card-info{padding:15px}
+ .actions{display:flex; justify-content:space-between; margin-top:15px}
+ .match-popup{position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:10}
+ .match-box{background:white; padding:30px; border-radius:20px; text-align:center; width:85%}
+ .chat-bubble{background:#f3f4f6; padding:10px 14px; border-radius:15px; margin:8px 0; max-width:80%}
+ .chat-bubble.me{background:#fce7f3; margin-left:auto}
+ .nav{display:flex; justify-content:around; border-top:1px solid #eee; position:fixed; bottom:0; width:100%; max-width:400px; background:white}
+ .nav button{width:33%; background:none; color:#888; border-radius:0}
+ .nav button.active{color:#b91c1c}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">AdumDate <small>KUMASI • GHANA</small></div>
+
+  <!-- SCREEN 1: CREATE PROFILE -->
+  <div id="screen-profile" class="screen active">
+    <h3>Create your profile</h3>
+    <input id="myName" placeholder="Your name e.g. Kwame">
+    <select id="myAge"><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option></select>
+    <select id="myLocation"><option>Adum</option><option>Kejetia</option><option>Amakom</option><option>Asafo</option><option>KNUST</option><option>Accra</option></select>
+    <textarea id="myBio" placeholder="About you... e.g. I love fufu and good vibes"></textarea>
+    <input id="myPhoto" type="file" accept="image/*">
+    <button class="btn-main" onclick="saveProfile()">Start Dating ❤️</button>
+  </div>
+
+  <!-- SCREEN 2: SWIPE -->
+  <div id="screen-swipe" class="screen">
+    <div class="card" id="currentCard"></div>
+    <div class="actions">
+      <button class="btn-pass" onclick="nextCard(false)">✖ Pass</button>
+      <button class="btn-like" onclick="nextCard(true)">❤ Like</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: MATCHES & CHAT -->
+  <div id="screen-matches" class="screen">
+    <h3>Your Matches</h3>
+    <div id="matchList"></div>
+    <div id="chatArea" style="display:none">
+      <h4 id="chatWith"></h4>
+      <div id="messages" style="height:250px; overflow-y:auto; margin:15px 0"></div>
+      <input id="msgInput" placeholder="Say hi...">
+      <button class="btn-main" onclick="sendMsg()">Send</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button id="navSwipe" onclick="showScreen('swipe')">🔥 Swipe</button>
+    <button id="navMatches" onclick="showScreen('matches')">💬 Matches</button>
+    <button onclick="showScreen('profile')">👤 Me</button>
+  </div>
+</div>
+
+<div class="match-popup" id="matchPopup">
+  <div class="match-box">
+    <h1 style="font-size:50px">❤️</h1>
+    <h2>It's a Match!</h2>
+    <p id="matchText"></p>
+    <button class="btn-main" onclick="closeMatch()">Send Message</button>
+  </div>
+</div>
+
+<script>
+let myProfile = JSON.parse(localStorage.getItem('adum_my')||'null');
+let profiles = [
+  {name:"Abigail", age:20, location:"Adum", bio:"WASSCE graduate, loves music", img:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400"},
+  {name:"Akosua", age:21, location:"Kejetia", bio:"Business student, love to laugh", img:"https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400"},
+  {name:"Serwaa", age:19, location:"Amakom", bio:"Looking for serious guy", img:"https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400"},
+  {name:"Kwesi", age:22, location:"KNUST", bio:"Engineer, gym guy", img:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400"}
+];
+let index=0; let matches=JSON.parse(localStorage.getItem('adum_matches')||'[]'); let currentChat=null;
+
+function saveProfile(){
+  const file = document.getElementById('myPhoto').files[0];
+  const reader = new FileReader();
+  reader.onload = function(e){
+    myProfile = {name:myName.value, age:myAge.value, location:myLocation.value, bio:myBio.value, img:e.target.result || 'https://via.placeholder.com/400'};
+    localStorage.setItem('adum_my', JSON.stringify(myProfile));
+    showScreen('swipe'); loadCard();
+  };
+  if(file) reader.readAsDataURL(file);
+  else {
+    myProfile = {name:myName.value, age:myAge.value, location:myLocation.value, bio:myBio.value, img:'https://via.placeholder.com/400'};
+    localStorage.setItem('adum_my', JSON.stringify(myProfile));
+    showScreen('swipe'); loadCard();
+  }
+}
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  if(name==='matches') renderMatches();
+  if(name==='swipe') loadCard();
+}
+
+function loadCard(){
+  if(index>=profiles.length){document.getElementById('currentCard').innerHTML="<h3>No more people in Kumasi 😅<br>Check tomorrow</h3>"; return;}
+  const p=profiles[index];
+  document.getElementById('currentCard').innerHTML=`<img src="${p.img}"><div class="card-info"><h3>${p.name}, ${p.age}</h3><small>${p.location}</small><p>${p.bio}</p></div>`;
+}
+
+function nextCard(liked){
+  if(liked){
+    // 60% chance they like you back = match
+    if(Math.random()>0.4){
+      matches.push(profiles[index]);
+      localStorage.setItem('adum_matches', JSON.stringify(matches));
+      document.getElementById('matchText').innerText=`You and ${profiles[index].name} liked each other`;
+      document.getElementById('matchPopup').style.display='flex';
+    }
+  }
+  index++; loadCard();
+}
+
+function closeMatch(){document.getElementById('matchPopup').style.display='none'; showScreen('matches');}
+function renderMatches(){
+  if(matches.length==0){matchList.innerHTML="<p>No matches yet. Go swipe! 🔥</p>"; return;}
+  matchList.innerHTML=matches.map((m,i)=>`<div onclick="openChat(${i})" style="display:flex; gap:10px; align-items:center; padding:10px; border-bottom:1px solid #eee; cursor:pointer"><img src="${m.img}" style="width:50px;height:50px;border-radius:50%;object-fit:cover"><div><b>${m.name}</b><br><small>${m.location}</small></div></div>`).join('');
+}
+function openChat(i){
+  currentChat=i; chatArea.style.display='block'; chatWith.innerText='Chat with '+matches[i].name; messages.innerHTML=`<div class="chat-bubble">Hi! Thanks for matching me on AdumDate 😊</div>`;
+}
+function sendMsg(){
+  if(!msgInput.value) return;
+  messages.innerHTML+=`<div class="chat-bubble me">${msgInput.value}</div>`; msgInput.value='';
+  setTimeout(()=>{messages.innerHTML+=`<div class="chat-bubble">Haha nice! When are we meeting at Adum? 😍</div>`; messages.scrollTop=messages.scrollHeight},1000);
+}
+if(myProfile){showScreen('swipe'); loadCard();}
+</script>
+</body>
+</html>
